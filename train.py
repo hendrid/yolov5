@@ -159,12 +159,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     else:
         model = Model(cfg, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # create
     amp = check_amp(model)  # check AMP
-
-    def add_eca_layer(model):
-      for name, module in model.named_modules():
-        if isinstance(module, nn.Conv2d):
-            module.add_module("eca", ECALayer())
-    add_eca_layer(model)
     
     # Freeze
     freeze = [f'model.{x}.' for x in (freeze if len(freeze) > 1 else range(freeze[0]))]  # layers to freeze
@@ -277,6 +271,11 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     model.hyp = hyp  # attach hyperparameters to model
     model.class_weights = labels_to_class_weights(dataset.labels, nc).to(device) * nc  # attach class weights
     model.names = names
+    # ECA
+    for name, module in model.named_modules():
+        if isinstance(module, nn.Conv2d):
+            module.add_module("eca", ECALayer())
+    print(model)
     
     # Start training
     t0 = time.time()
@@ -295,7 +294,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 f'Using {train_loader.num_workers * WORLD_SIZE} dataloader workers\n'
                 f"Logging results to {colorstr('bold', save_dir)}\n"
                 f'Starting training for {epochs} epochs...')
-    print(model)
+    
     for epoch in range(start_epoch, epochs):  # epoch ------------------------------------------------------------------
         callbacks.run('on_train_epoch_start')
         model.train()
